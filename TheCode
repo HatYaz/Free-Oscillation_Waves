@@ -2,7 +2,7 @@
 """
 Created on Sat Apr  6 17:04:54 2024
 
-@author: Hatem Yazidi
+@author: HP
 M = 10
 R = 5
 S = 60
@@ -69,8 +69,17 @@ def plot_solution(values):
     # Calculate corresponding velocity u for each x
     u = np.gradient(x, t)
     
+    # Calculate damping coefficient delta
+    delta = R / (2 * m)
+    
+    # Calculate damped frequency fd
+    f0 = np.sqrt(S / m) / (2 * np.pi)
+    fd = np.sqrt(f0**2 - delta**2)
+    
+    # Calculate quality factor Q
+    Q = 1 / (1 - np.exp(-2 * delta / fd))
+    
     # Plotting x/x0 = f(t/T0)
-    f0 = np.sqrt(S/m) / (2 * np.pi)
     T0 = 2 * np.pi / f0
     t_normalized = t / T0
     
@@ -79,7 +88,7 @@ def plot_solution(values):
     plt.plot(t_normalized, x/x0)
     plt.xlabel('t/T0')
     plt.ylabel('x/x0')
-    plt.title('Solution of the Differential Equation')
+    plt.title('Solution of the Differential Equation - Free Oscillations')
     plt.xlim([np.min(t_normalized), np.max(t_normalized)])  # Ensure x-axis crosses at 0
     plt.ylim([-1, 1])  # Set the limits of the y-axis symmetrically around 0
     plt.axhline(0, color='black', linewidth=0.5)  # Draw x-axis at y=0
@@ -104,7 +113,7 @@ def plot_solution(values):
     plt.savefig(buf, format='png')
     plt.close()
     buf.seek(0)
-    return buf.read()
+    return buf.read(), delta, fd, Q
 
 # Create the GUI
 sg.theme('DarkAmber')
@@ -114,8 +123,11 @@ layout = [
     [sg.Text(('Stiffness (N/m):'), size=(25, 1)), sg.InputText(key='stiffness', size=(10, 1))],
     [sg.Text(('Initial Position (m):'), size=(25, 1)), sg.InputText(key='initial_position', size=(10, 1))],
     [sg.Text(('Initial Velocity (m/s):'), size=(25, 1)), sg.InputText(key='initial_velocity', size=(10, 1))],
+    [sg.Image(key='-IMAGE_X-'), sg.Image(key='-IMAGE_W-')],
+    [sg.Text('Damping Coefficient (delta):'), sg.Text('', size=(10, 1), key='-DELTA-')],
+    [sg.Text('Damped Frequency (fd):'), sg.Text('', size=(10, 1), key='-FD-')],
+    [sg.Text('Quality Factor (Q):'), sg.Text('', size=(10, 1), key='-Q-')],
     [sg.Button('Run Simulation', key='run_simulation'), sg.Button('Exit')],
-    [sg.Image(key='-IMAGE_X-'), sg.Image(key='-IMAGE_W-')]
 ]
 
 window = sg.Window('Differential Equation Solver', layout)
@@ -125,7 +137,10 @@ while True:
     if event == sg.WIN_CLOSED or event == 'Exit':
         break
     elif event == 'run_simulation':
-        image_x_bytes = plot_solution(values)
+        image_x_bytes, delta, fd, Q = plot_solution(values)
         window['-IMAGE_X-'].update(data=image_x_bytes)
+        window['-DELTA-'].update('{:.2f}'.format(delta))
+        window['-FD-'].update('{:.2f}'.format(fd))
+        window['-Q-'].update('{:.2f}'.format(Q))
 
 window.close()
