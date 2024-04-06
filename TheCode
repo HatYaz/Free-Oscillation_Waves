@@ -1,0 +1,131 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Apr  6 17:04:54 2024
+
+@author: Hatem Yazidi
+M = 10
+R = 5
+S = 60
+x0 = 1
+v0 = 0
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+import PySimpleGUI as sg
+import io
+
+def solve_differential_equation(m, R, S, x0, v0, t_span, t_eval):
+    """
+    Solves the differential equation:
+    m d^2x/dt^2 + R dx/dt + S x = 0
+    
+    Parameters:
+    m (float): Mass
+    R (float): Mechanical resistance
+    S (float): Stiffness
+    x0 (float): Initial position
+    v0 (float): Initial velocity
+    t_span (tuple): Time span for the solution
+    t_eval (array): Time points at which to evaluate the solution
+    
+    Returns:
+    t (array): Time values
+    x (array): Solution for the position x
+    """
+    def diff_eq(t, y):
+        x, v = y
+        return [v, -(R/m)*v - (S/m)*x]
+    
+    y0 = [x0, v0]
+    sol = solve_ivp(diff_eq, t_span, y0, t_eval=t_eval)
+    return sol.t, sol.y[0]
+
+def calculate_energy(x, u, m, x0, u0, S):
+    """
+    Calculates the energy over time
+    """
+    W0 = 0.5 * (S * x0**2 + m * u0**2)
+    W = 0.5 * (S * x**2 + m * u**2)
+    return W / W0
+
+def plot_solution(values):
+    """
+    Runs the simulation and updates the plots based on user inputs
+    """
+    m = float(values['mass'])
+    R = float(values['resistance'])
+    S = float(values['stiffness'])
+    x0 = float(values['initial_position'])
+    v0 = float(values['initial_velocity'])
+    u0 = v0
+    
+    t_span = (0, 10)
+    t_eval = np.linspace(0, 10, 1000)
+    
+    t, x = solve_differential_equation(m, R, S, x0, v0, t_span, t_eval)
+    
+    # Calculate corresponding velocity u for each x
+    u = np.gradient(x, t)
+    
+    # Plotting x/x0 = f(t/T0)
+    f0 = np.sqrt(S/m) / (2 * np.pi)
+    T0 = 2 * np.pi / f0
+    t_normalized = t / T0
+    
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.plot(t_normalized, x/x0)
+    plt.xlabel('t/T0')
+    plt.ylabel('x/x0')
+    plt.title('Solution of the Differential Equation')
+    plt.xlim([np.min(t_normalized), np.max(t_normalized)])  # Ensure x-axis crosses at 0
+    plt.ylim([-1, 1])  # Set the limits of the y-axis symmetrically around 0
+    plt.axhline(0, color='black', linewidth=0.5)  # Draw x-axis at y=0
+    plt.axvline(0, color='black', linewidth=0.5)  # Draw y-axis at x=0
+    plt.grid()
+
+    # Calculate energy W/W0
+    W = calculate_energy(x, u, m, x0, u0, S)
+    
+    # Plotting W/W0 = f(t/T0)
+    plt.subplot(1, 2, 2)
+    plt.plot(t_normalized, W)
+    plt.xlabel('t/T0')
+    plt.ylabel('W/W0')
+    plt.title('Normalized Energy over Time')
+    plt.xlim([np.min(t_normalized), np.max(t_normalized)])  # Ensure x-axis crosses at 0
+    plt.ylim([0, 1])  # Set the limits of the y-axis between 0 and 1
+    plt.grid()
+
+    # Convert plots to bytes for PySimpleGUI
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close()
+    buf.seek(0)
+    return buf.read()
+
+# Create the GUI
+sg.theme('DarkAmber')
+layout = [
+    [sg.Text(('Mass (kg):'), size=(25, 1)), sg.InputText(key='mass', size=(10, 1))],
+    [sg.Text(('Mechanical Resistance (Ns/m):'), size=(25, 1)), sg.InputText(key='resistance', size=(10, 1))],
+    [sg.Text(('Stiffness (N/m):'), size=(25, 1)), sg.InputText(key='stiffness', size=(10, 1))],
+    [sg.Text(('Initial Position (m):'), size=(25, 1)), sg.InputText(key='initial_position', size=(10, 1))],
+    [sg.Text(('Initial Velocity (m/s):'), size=(25, 1)), sg.InputText(key='initial_velocity', size=(10, 1))],
+    [sg.Button('Run Simulation', key='run_simulation'), sg.Button('Exit')],
+    [sg.Image(key='-IMAGE_X-'), sg.Image(key='-IMAGE_W-')]
+]
+
+window = sg.Window('Differential Equation Solver', layout)
+
+while True:
+    event, values = window.read()
+    if event == sg.WIN_CLOSED or event == 'Exit':
+        break
+    elif event == 'run_simulation':
+        image_x_bytes = plot_solution(values)
+        window['-IMAGE_X-'].update(data=image_x_bytes)
+
+window.close()
